@@ -1,0 +1,201 @@
+###### **1 O controlo de concorrência, por exemplo, com trincos (locks), tem impacto no desempenho. Explique quais as estratégias genéricas para minimizar esse impacto. Use exemplos.**
+
+###### 
+
+Minimizar as operações feitas na zona crítica (fazer cálculos fora e só atualizar a variável na CS), utilizar fine-grained locks, ou seja, usar locks em objetos e não um global, e usar ReadWrite locks para aumentar o paralelismo caso os não haja muitas operações de escrita.
+
+###### 
+
+###### **2 Considere um sistema em três camadas (3-tier) em que os clientes contactam um servidor aplicacional A, sem estado persistente, que usa por sua vez um servidor B de base de dados. Discuta as estratégias de threading adequadas a cada um dos servidores.**
+
+###### 
+
+Do cliente para o servidor A utilizar thread-per-request seria o mais indicado, visto que apenas tem uma pool de threads, não há risco de explodir o servidor, sendo que os requests aquando todas as threads estão a ser usadas são postos em espera.
+**Já do servidor A para o B, visto que este vai ser limitado pelo I/O do disco, um modelo com pool fixa limitada pelos cores ou capacidade de disco e filas de espera parece ser a melhor estratégia.**
+Já do servidor A para o B, visto que só irão existir as threads que estão na pool, podemos usar o thread-per-connection, de modo a cada thread da pool criar uma conexão com o servidor B, só fechando a thread nova quando a conexão for fechada (quando já não tem mais nada a pedir).
+
+###### 
+
+###### **3 Explique como é que o protocolo 2PC (two phase commit) resolve uma falha de um participante durante a segunda fase.**
+
+###### 
+
+Visto que o 2PC já se encontra na 2ª fase, quer dizer que todos os participantes concordaram com a decisão, logo o coordenador avisa para todos darem commit, mas, caso algum participante falhe e não receba essa informação, todos os outros irão dar commit e quando, o que falhou, voltar, vai perguntar ao coordenador qual a decisão, uma
+
+vez que nos logs ele tinha estava preparado para fazer uma ação.
+
+###### 
+
+###### **4 Identifique o desafio principal na procura de informação num sistema distribuído e explique como é resolvido por uma DHT como o Chord.**
+
+###### 
+
+O maior desafio na procura de informação está onde procurar essa informação, sendo este resolvido por uma DHT, como o Chord, onde cada nó tem uma tabela de encaminhamento (Finger Table) que redireciona para os seus vizinhos numa escala **2^n**, onde n>=0, reduzindo o tempo de procura de O(N) para O(log(N)).
+
+###### 
+
+###### **1 Nas tres seguintes arquiteturas de sistemas distribuıdos que estudamos, Layered, Event-Based, e Peer-to-Peer, onde encontramos exemplos da arquitetura Cliente-Servidor (Client-Server)?**
+
+###### 
+
+Encontramos em todos, visto que na arquitetura Layered temos 3 camadas, sendo que o cliente interage com a primeira e depois, a 2ª e a 3ª funcionam como servidor, mantendo o estado e funcionalidades nestas camadas. Já na Event-Based temos que os clientes que subscrevem ao que os servidores publicam. Na P2P também encontramos, visto que cada Peer é, ao mesmo tempo, cliente e servidor.
+
+###### 
+
+###### **2 A utilizacao de variaveis de condicao exige que sejam manipuladas em estreita coordenacao com um lock. Explique porque e como. Auxilie-se de um exemplo conciso em pseudo-codigo que suporte a sua resposta.**
+
+###### 
+
+As variáveis de condição têm de ser manipuladas em coordenação com o lock, visto que estas libertam o lock que estão a usar até que a condição seja verdadeira.
+
+
+
+**O Lock é obrigatório para garantir a atomicidade entre a verificação da condição e a suspensão. Sem o Lock, uma thread poderia verificar a condição, ser interrompida antes de fazer await, e entretanto outra thread dava signal, ficando a primeira thread atrasada, dando await depois do signal e ficando sempre à espera (Lost Wakeup).**
+
+
+
+ReentrantLock l = new ReentrantLock();
+
+Condition c = l.newCondition();
+
+
+
+l.lock();
+
+try{
+
+ 	while(buffer.isEmpty){
+
+ 		c.await();
+
+ 	}
+
+}
+
+finally{
+
+ 	l.unlock();
+
+}
+
+###### 
+
+###### **3 Considere a arquitetura generica Cliente-Servidor. Explique porque razao devemos evitar que, no servidor, uma mesma thread seja responsavel por escrever para multiplos sockets, associados a diferentes clientes.**
+
+###### 
+
+Porque uma thread pode bloquear por causa de um cliente, dando starve a todos os outros clientes que estão ligados a esse socket.
+
+###### 
+
+###### **4 Considere um algoritmo distribuıdo para garantia de exclusao mutua no acesso a recursos partilhados baseado nos relogios de tempo real (hardware clocks) dos nos. O que e usual assumirmos sobre o tempo de comunicacao entre dois nos. Porque?**
+
+###### 
+
+Como o algoritmo está a usar relógios de tempo real, não temos como assegurar que o tempo de comunicação entre 2 nós vai ser linear, pois existe clock drift e clock skew que mudam o tempo real de cada relógio de forma independente, não sendo possível manter o tempo constante.
+
+
+
+**É usual assumir que existe um limite superior conhecido (bounded delay) para o tempo de transmissão das mensagens, visto que, caso não exista, é impossível distinguir se uma mensagem está atrasada ou se o nó falhou, sendo também impossível sincronizar os relógios com um erro limitado.**
+
+###### 
+
+###### **1 Explique que tipo de situacoes justificam a utilizacao de uma variavel de condicao no controlo de programas concorrentes. Auxilie-se de um exemplo conciso em pseudo-codigo que suporte a sua resposta.**
+
+###### 
+
+Uma variável de condição é usada quando precisamos de fazer locks esperar por um evento.
+
+**Uma variável de condição permite que uma thread suspenda a execução até que uma determinada condição seja alcançada.**
+
+
+
+l.lock();
+
+try{
+
+ 	while(buffer.isEmpty){
+
+ 		c.await();
+
+ 	}
+
+}
+
+finally{
+
+ 	l.unlock();
+
+}
+
+###### 
+
+###### **2 Considere a arquitetura generica cliente/servidor e, no no servidor, o atendimento orientado a conexao, com uma thread por conexao (thread-per-connection), e o atendimento orientado ao pedido, com uma thread dedicada a cada pedido (thread-per-request). Descreva sucintamente o que distingue os dois modelos e elabore sobre as vantagens de cada uma das abordagens.**
+
+###### 
+
+Na thread-per-connection temos que, assim que a conexão é feita, uma thread vai ser criada exclusivamente para esse atendimento, sendo fechada assim que a conexão seja concluída. Já a thread-per-request usa threads já existentes no servidor para fazer o trabalho, não sendo preciso fechar a thread assim que a conexão seja fechada. Esta última é vantajosa em relação à primeira caso as conexões sejam rápidas, visto que pode haver, rapidamente, overflow the conexões, ficando os clientes à espera enquanto as threads não são libertadas. Já na thread-per-connection, este problema não existe, porém não é tão eficiente, visto que está sempre a abrir e fechar threads.
+
+
+
+**Thread-per-connection: Cria uma thread por cada cliente ligado. Vantagem: Simples de programar e manter estado local. Desvantagem: não escala.**
+
+
+
+**Thread-per-request: Usa um pool fixo de threads que atendem pedidos pontuais e ficam livres logo a seguir. Vantagem: Alta escalabilidade e robustez. Desvantagem: Obriga a uma arquitetura onde o estado é guardado fora.**
+
+###### 
+
+###### **3 Na implementacao de um algoritmo distribuıdo para garantia de exclusao mutua no acesso a recursos partilhados, argumente sobre as vantagens e desvantagens da utilizacao de relogios de tempo real (hardware clocks) ou logicos, como o proposto por Leslie Lamport.**
+
+###### 
+
+ Os relógios de tempo real só funcionam bem caso seja o mesmo dispositivo ou caso os dispositivos apresentem o mesmo tempo real, porém, e caso exista clock drift, estes vão estar a mandar mensagens para o passado, o que não forma uma ordem cronológica coerente, caso que não acontece nos relógios de Lamport, visto que estes garantem uma relação de causalidade no sistema, ao não deixar enviar mensagens para o passado, visto que todas as mensagens enviadas têm um tempo lógico de max(meuTempo, teuTempo) + 1, seguindo uma ordem linear.
+
+###### 
+
+###### **4 Qual o problema enderecado pelo protocolo de two-phase-commit? Elabore sobre as limitacoes do algoritmo, se as houver, no caso de inexistencia de falhas dos nos participantes**
+
+
+
+O problema resolvido pelo 2PC é de coordenação de eventos para o sistema, porém este é limitado tanto pelas falhas no coordenador, tanto nos participantes, onde nestes últimos podem falhar na 1ª fase, onde, caso 1 participante falhe, o coordenador dá rollback e aborta o commit, e na 2ª fase, onde todos os outros participantes dão commit, e o participante que falhou vai aos logs ver a decisão, dando commit assim que voltar.
+
+
+
+**O problema endereçado é o Commit atómico(garantir que uma transação é feita por todos ou por ninguém).**
+
+**Limitações sem falhas: Mesmo que nenhum nó falhe, o protocolo exige 2 RTT, votar + commit. Durante este tempo, os locks mantêm-se ativos nos participantes, impedindo outras transações de aceder aos mesmos dados, o que reduz o throughput do programa.**
+
+
+
+###### **1 Caracterize, comparativamente, as arquiteturas de sistemas distribuıdos estudadas.**
+
+
+
+A arquitetura Client-Server usa um único servidor como ponto central do sistema, mantendo as funcionalidades e o estado dentro deste, enquanto a Layered apresenta interfaces concretas, bem como uma lógica de negócio e uma camada de dados, onde maior parte das funcionalidades são feitas na lógica de negócio e o estado persiste na camada de dados. Já numa Event-Based, os participantes enviam pedidos e respostas para um router principal, onde este redireciona para os participantes interessados. ***Já numa Event-Based, os produtores publicam eventos num Bus e consumidores subscrevem tipos de eventos, sem que o produtor saiba quem/quantos o vão receber.*** Por último a Peer 2 Peer é a única arquitetura descentralizada e que se organiza por si só, mantendo o estado em cada participante, visto que este se designa como cliente e servidor ao mesmo tempo, trocando assim pedidos e respostas.
+
+
+
+###### **2 Indique os cuidados a ter para minimizar o impacto da utilizacao de locks no desempenho dos programas.**
+
+
+
+Tentar usar fine-grained locks e não coarsed-grained locks. Não causar deadlocks para o programa ficar parado sem fazer nada.
+
+***Deve-se optar por usar Fine-Grained Locking, ou seja, Locks por objeto e não um global; reduzir ao máximo operações na zona crítica, ou seja, fazer operações de cálculos fora do Lock e só atualizar a variável dentro deste; e utilizar Read-Write Locks para permitir leituras paralelas quando a escrita é pouco frequente.***
+
+
+
+###### **3 Explique a importancia da serializacao e reestruturacao de dados para a implementacao de sistemas distribuıdos e indique obstaculos a sua realizacao.**
+
+
+
+A serialização é importante **para lidar com** a heterogeneidade de dados, **convertendo grafos de objetos em memória num formato linear de bytes para transmissão**. Porém, também existem alguns obstáculos para a sua realização, tal como o versioning, onde versões diferentes podem ter traduções diferentes e então comunicações erradas. Também há problema quando se usa endereços privados e ponteiros, **bem como a gestão de ciclos,** sendo estes problemas difíceis de **resolver**.
+
+
+
+###### **4 Indique que relacao entre eventos, locais e remotos, captura um relogio logico e em que medida e ou nao suficiente para a implementacao de um mecanismo de exclusao mutua distribuıdo.**
+
+
+
+Os relógios de Lamport usam um tempo lógico onde, qualquer que seja o meu tempo lógico, faz-se sempre max(meuTempo, outroTempo) + 1, conseguindo assim uma ordem cronológica coerente, **garantindo uma relação de causalidade entre eventos**. Isto por si só **não** é suficiente para a implementação de um mecanismo de exclusão mútua distribuído, **porém** tal como acontece no algoritmo de Ricart-Agrawala\*\*, ao adicionar o ID do processo como critério de desempate, consegue-se criar uma ordem total de pedidos, permitindo que todos os nós concordem quem pediu acesso primeiro.\*\*
